@@ -1,6 +1,6 @@
 # StreamVault
 
-Full-stack authentication system built with FastAPI + React 18. Supports email/password auth, Google OAuth, JWT sessions, and password reset via email.
+Full-stack video streaming app with a production-grade auth system. Supports email/password auth, Google OAuth, JWT sessions, password reset via email, and a universal video player (YouTube, MP4, HLS).
 
 ## Tech Stack
 
@@ -11,6 +11,7 @@ Full-stack authentication system built with FastAPI + React 18. Supports email/p
 | Database | MongoDB Atlas |
 | Auth | Google OAuth 2.0, JWT (stored in localStorage) |
 | Email | Gmail SMTP via aiosmtplib |
+| Video | react-player (YouTube/Vimeo), hls.js (HLS/MP4) |
 
 ---
 
@@ -46,38 +47,11 @@ pip install -r requirements.txt
 
 ### Create your `.env` file
 
-Copy the example and fill in your values:
-
 ```bash
 cp .env.example .env
 ```
 
-Edit `backend/.env`:
-
-```env
-# MongoDB Atlas connection string
-MONGODB_URL=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/?appName=Cluster0
-DATABASE_NAME=auth_db
-
-# JWT — generate with: python -c "import secrets; print(secrets.token_hex(32))"
-SECRET_KEY=your-64-char-hex-secret
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=10080
-
-# Google OAuth (see setup below)
-GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
-GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
-
-# Gmail SMTP (use an App Password, NOT your Gmail login password)
-SMTP_USER=you@gmail.com
-SMTP_PASSWORD=xxxx xxxx xxxx xxxx
-FROM_NAME=StreamVault
-
-# App
-FRONTEND_URL=http://localhost:5173
-APP_NAME=StreamVault
-```
+Edit `backend/.env` and fill in all values (see `.env.example` for field descriptions).
 
 ### Run the backend
 
@@ -86,7 +60,7 @@ APP_NAME=StreamVault
 uvicorn main:app --reload --port 8000
 ```
 
-API is now at `http://localhost:8000`. Docs at `http://localhost:8000/docs`.
+API → `http://localhost:8000` | Docs → `http://localhost:8000/docs`
 
 ---
 
@@ -98,7 +72,7 @@ npm install
 npm run dev
 ```
 
-App is now at `http://localhost:5173`.
+App → `http://localhost:5173`
 
 ---
 
@@ -113,13 +87,15 @@ App is now at `http://localhost:5173`.
 
 ## 5. Gmail SMTP setup
 
-Gmail requires an App Password (not your login password):
+Gmail requires an App Password (not your regular login password):
 
 1. Enable 2-Step Verification on your Google account
 2. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-3. Create a new app password (name it anything, e.g. "StreamVault")
+3. Create a new app password (name it "StreamVault")
 4. Copy the 16-character password into `SMTP_PASSWORD` in your `.env`
 5. Set `SMTP_USER` to your Gmail address
+
+> **Note:** Forgot password only works for email/password accounts. Google OAuth accounts are shown a "use Google Sign-In" message instead.
 
 ---
 
@@ -145,17 +121,20 @@ StreamVault/
 │   └── src/
 │       ├── components/
 │       │   ├── ProtectedRoute.tsx
-│       │   └── ui/           # shadcn/ui components
+│       │   ├── VideoPlayer.jsx      # Routes YouTube vs MP4/HLS
+│       │   ├── YoutubePlayer.jsx    # react-player with Suspense
+│       │   ├── Html5Player.jsx      # Custom player: HLS + MP4, full controls
+│       │   └── ui/                  # shadcn/ui components
 │       ├── context/
 │       │   └── AuthContext.tsx
 │       ├── hooks/
 │       │   └── useAuth.ts
 │       ├── lib/
-│       │   └── api.ts        # axios instance + all API calls
+│       │   └── api.ts               # axios instance + all API calls
 │       └── pages/
 │           ├── Login.tsx
 │           ├── Signup.tsx
-│           ├── Dashboard.tsx
+│           ├── Dashboard.tsx        # Video player UI
 │           ├── OAuthCallback.tsx
 │           ├── SetupUsername.tsx
 │           └── ResetPassword.tsx
@@ -175,6 +154,20 @@ StreamVault/
 | New Google user | Redirected to `/setup-username` to choose a username |
 | Forgot password | POST `/auth/forgot-password` → reset link emailed (email/password accounts only) |
 | Reset password | POST `/auth/reset-password` → token verified, password updated |
+
+---
+
+## Video player
+
+The dashboard includes a universal video player. Paste any URL and click **Play Video**:
+
+| URL type | Player used |
+|---|---|
+| `youtube.com` / `youtu.be` | react-player (YouTube embed) |
+| `.mp4` or direct video file | Custom HTML5 player |
+| `.m3u8` (HLS stream) | Custom HTML5 player via hls.js |
+
+**Keyboard shortcuts** (HTML5 player): `Space` play/pause · `←` rewind 10s · `→` forward 10s · `M` mute
 
 ---
 
