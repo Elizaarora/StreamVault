@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import ReactPlayer from "react-player/youtube";
+import ReactPlayer from "react-player";
 
 export default function YoutubePlayer({ url }) {
   return (
