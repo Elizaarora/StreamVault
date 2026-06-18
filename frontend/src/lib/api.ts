@@ -28,7 +28,8 @@ api.interceptors.response.use(
 
 export interface AuthUser {
   id: string;
-  username: string;
+  first_name: string;
+  last_name: string;
   email: string;
   avatar?: string;
   created_at: string;
@@ -41,7 +42,7 @@ export interface TokenResponse {
 }
 
 export const authApi = {
-  signup: (data: { username: string; email: string; password: string }) =>
+  signup: (data: { first_name: string; last_name: string; email: string; password: string }) =>
     api.post<TokenResponse>("/auth/signup", data),
 
   login: (data: { email: string; password: string }) =>
@@ -49,12 +50,7 @@ export const authApi = {
 
   me: () => api.get<AuthUser>("/auth/me"),
 
-  googleLogin: (mode: "signin" | "signup" = "signin") => {
-    window.location.href = `${API_BASE}/auth/google?mode=${mode}`;
-  },
-
-  setUsername: (username: string) =>
-    api.patch<AuthUser>("/auth/username", { username }),
+  // Google OAuth and username setup removed; app uses email/password only
 
   forgotPassword: (email: string) =>
     api.post<{ message: string; dev_reset_url?: string }>("/auth/forgot-password", { email }),

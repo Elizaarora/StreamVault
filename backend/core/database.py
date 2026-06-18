@@ -10,13 +10,7 @@ async def connect_db():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
     db = client[settings.DATABASE_NAME]
     await db.users.create_index("email", unique=True)
-    # Drop old non-sparse username index if it exists, then recreate as sparse
-    # (sparse=True allows multiple documents with username=None)
-    try:
-        await db.users.drop_index("username_1")
-    except Exception:
-        pass
-    await db.users.create_index("username", unique=True, sparse=True)
+    # no username index needed — app uses first/last name and email as unique identifier
     print(f"Connected to MongoDB: {settings.DATABASE_NAME}")
 
 

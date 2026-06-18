@@ -17,10 +17,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Authenticated but hasn't chosen a username yet (Google sign-up)
-  if (!user?.username && location.pathname !== "/setup-username") {
-    return <Navigate to="/setup-username" replace />;
-  }
 
   return <>{children}</>;
 }

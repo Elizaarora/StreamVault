@@ -4,20 +4,29 @@ from datetime import datetime
 
 
 class UserCreate(BaseModel):
-    username: str
+    first_name: str
+    last_name: str
     email: EmailStr
     password: str
 
-    @field_validator("username")
+    @field_validator("first_name")
     @classmethod
-    def username_valid(cls, v: str) -> str:
+    def first_name_valid(cls, v: str) -> str:
         v = v.strip()
-        if len(v) < 3:
-            raise ValueError("Username must be at least 3 characters")
-        if len(v) > 30:
-            raise ValueError("Username must be at most 30 characters")
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username may only contain letters, numbers, hyphens, and underscores")
+        if len(v) < 1:
+            raise ValueError("First name is required")
+        if len(v) > 50:
+            raise ValueError("First name is too long")
+        return v
+
+    @field_validator("last_name")
+    @classmethod
+    def last_name_valid(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 1:
+            raise ValueError("Last name is required")
+        if len(v) > 50:
+            raise ValueError("Last name is too long")
         return v
 
     @field_validator("password")
@@ -35,7 +44,8 @@ class UserLogin(BaseModel):
 
 class UserOut(BaseModel):
     id: str
-    username: Optional[str] = None
+    first_name: str
+    last_name: str
     email: str
     avatar: Optional[str] = None
     created_at: datetime
@@ -54,22 +64,6 @@ class ResetPasswordRequest(BaseModel):
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
-        return v
-
-
-class SetUsernameRequest(BaseModel):
-    username: str
-
-    @field_validator("username")
-    @classmethod
-    def username_valid(cls, v: str) -> str:
-        v = v.strip()
-        if len(v) < 3:
-            raise ValueError("Username must be at least 3 characters")
-        if len(v) > 30:
-            raise ValueError("Username must be at most 30 characters")
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username may only contain letters, numbers, hyphens, and underscores")
         return v
 
 

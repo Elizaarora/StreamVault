@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timezone
 from bson import ObjectId
@@ -8,8 +7,7 @@ from core.database import get_db
 from core.security import hash_password, verify_password, create_access_token, decode_access_token
 from core.config import settings
 from core.email import send_password_reset_email
-from models.user import UserCreate, UserLogin, UserOut, TokenResponse, SetUsernameRequest, ForgotPasswordRequest, ResetPasswordRequest
-from auth import exchange_google_code, get_google_user_info
+from models.user import UserCreate, UserLogin, UserOut, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer()
@@ -18,7 +16,8 @@ bearer = HTTPBearer()
 def _serialize_user(doc: dict) -> UserOut:
     return UserOut(
         id=str(doc["_id"]),
-        username=doc.get("username"),
+        first_name=doc.get("first_name") or "",
+        last_name=doc.get("last_name") or "",
         email=doc["email"],
         avatar=doc.get("avatar"),
         created_at=doc["created_at"],
@@ -44,14 +43,11 @@ async def signup(body: UserCreate):
     db = get_db()
     if await db.users.find_one({"email": body.email}):
         raise HTTPException(status_code=409, detail="Email already registered")
-    if await db.users.find_one({"username": body.username}):
-        raise HTTPException(status_code=409, detail="Username already taken")
-
     doc = {
-        "username": body.username,
+        "first_name": body.first_name,
+        "last_name": body.last_name,
         "email": body.email,
         "hashed_password": hash_password(body.password),
-        "google_id": None,
         "avatar": None,
         "created_at": datetime.now(timezone.utc),
     }
@@ -68,11 +64,6 @@ async def login(body: UserLogin):
     user = await db.users.find_one({"email": body.email})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.get("hashed_password"):
-        raise HTTPException(
-            status_code=401,
-            detail="This account uses Google Sign-In. Please click 'Continue with Google'.",
-        )
     if not verify_password(body.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -80,62 +71,7 @@ async def login(body: UserLogin):
     return TokenResponse(access_token=token, user=_serialize_user(user))
 
 
-@router.get("/google")
-async def google_login(mode: str = "signin"):
-    from urllib.parse import urlencode
-    # Pass mode through OAuth state param so callback knows the intent
-    params = urlencode({
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "access_type": "offline",
-        "prompt": "select_account",
-        "state": mode,
-    })
-    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
-
-
-@router.get("/google/callback")
-async def google_callback(code: str, state: str = "signin", error: str = None):
-    if error:
-        return RedirectResponse(f"{settings.FRONTEND_URL}/login?error=google_denied")
-
-    try:
-        tokens = await exchange_google_code(code)
-        google_user = await get_google_user_info(tokens["access_token"])
-    except Exception:
-        return RedirectResponse(f"{settings.FRONTEND_URL}/login?error=google_failed")
-
-    db = get_db()
-    user = await db.users.find_one({"email": google_user["email"]})
-
-    if user and state == "signup":
-        # Tried to sign up but account already exists — redirect to login with message
-        return RedirectResponse(f"{settings.FRONTEND_URL}/login?error=already_registered")
-
-    if not user:
-        # New user — create account without username (user will choose it on next screen)
-        doc = {
-            "username": None,
-            "email": google_user["email"],
-            "hashed_password": None,
-            "google_id": google_user["sub"],
-            "avatar": google_user.get("picture"),
-            "created_at": datetime.now(timezone.utc),
-        }
-        result = await db.users.insert_one(doc)
-        doc["_id"] = result.inserted_id
-        user = doc
-    else:
-        if not user.get("google_id"):
-            await db.users.update_one(
-                {"_id": user["_id"]},
-                {"$set": {"google_id": google_user["sub"], "avatar": google_user.get("picture")}},
-            )
-
-    token = create_access_token({"sub": str(user["_id"])})
-    return RedirectResponse(f"{settings.FRONTEND_URL}/oauth/callback?token={token}")
+# Google OAuth removed — app uses email/password only
 
 
 @router.post("/forgot-password")
@@ -152,12 +88,6 @@ async def forgot_password(body: ForgotPasswordRequest):
     if not user:
         return generic  # don't reveal if email exists
 
-    if not user.get("hashed_password"):
-        raise HTTPException(
-            status_code=400,
-            detail="This account uses Google Sign-In and has no password. Please sign in with Google instead.",
-        )
-
     token = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(hours=1)
 
@@ -167,7 +97,7 @@ async def forgot_password(body: ForgotPasswordRequest):
     )
 
     reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-    username = user.get("username") or user["email"].split("@")[0]
+    username = (user.get("first_name") or "") or user["email"].split("@")[0]
 
     try:
         await send_password_reset_email(
@@ -205,19 +135,7 @@ async def reset_password(body: ResetPasswordRequest):
     return {"message": "Password updated successfully. You can now sign in."}
 
 
-@router.patch("/username", response_model=UserOut)
-async def set_username(body: SetUsernameRequest, current_user: dict = Depends(get_current_user)):
-    if current_user.get("username"):
-        raise HTTPException(status_code=400, detail="Username is already set")
-    db = get_db()
-    if await db.users.find_one({"username": body.username}):
-        raise HTTPException(status_code=409, detail="Username already taken")
-    await db.users.update_one(
-        {"_id": current_user["_id"]},
-        {"$set": {"username": body.username}},
-    )
-    current_user["username"] = body.username
-    return _serialize_user(current_user)
+
 
 
 @router.get("/me", response_model=UserOut)

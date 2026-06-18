@@ -28,7 +28,7 @@ export default function Dashboard() {
     setPlayUrl(url.trim());
   }
 
-  const initials = user?.username?.slice(0, 2).toUpperCase() ?? "??";
+  const initials = (user ? ((user.first_name?.[0] || "") + (user.last_name?.[0] || "")) : "").toUpperCase() || (user?.email?.slice(0,2).toUpperCase() ?? "??");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900">
@@ -48,10 +48,10 @@ export default function Dashboard() {
               onClick={() => setMenuOpen((v) => !v)}
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10 transition-colors"
             >
-              {user?.avatar ? (
+                {user?.avatar ? (
                 <img
                   src={user.avatar}
-                  alt={user.username ?? ""}
+                  alt={`${user.first_name ?? ""} ${user.last_name ?? ""}`}
                   className="h-8 w-8 rounded-full object-cover ring-2 ring-slate-200"
                 />
               ) : (
@@ -60,7 +60,7 @@ export default function Dashboard() {
                 </div>
               )}
               <span className="hidden text-sm font-medium text-white md:block">
-                {user?.username}
+                {user ? `${user.first_name} ${user.last_name}` : ""}
               </span>
               <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </button>
@@ -70,7 +70,7 @@ export default function Dashboard() {
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 z-20 mt-1.5 w-48 rounded-xl border border-white/10 bg-slate-900 p-1 shadow-2xl">
                   <div className="px-3 py-2 border-b border-white/10 mb-1">
-                    <p className="text-sm font-medium text-white truncate">{user?.username}</p>
+                    <p className="text-sm font-medium text-white truncate">{user ? `${user.first_name} ${user.last_name}` : ""}</p>
                     <p className="text-xs text-slate-400 truncate">{user?.email}</p>
                   </div>
                   <button
@@ -106,7 +106,7 @@ export default function Dashboard() {
                 </div>
               )}
               <div>
-                <h1 className="text-lg font-bold text-white">{user?.username}</h1>
+                <h1 className="text-lg font-bold text-white">{user ? `${user.first_name} ${user.last_name}` : ""}</h1>
                 <p className="text-sm text-slate-400">{user?.email}</p>
               </div>
               <Button
